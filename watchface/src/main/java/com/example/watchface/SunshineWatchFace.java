@@ -20,22 +20,29 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.Resources;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.Rect;
-import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
 import android.support.wearable.watchface.CanvasWatchFaceService;
 import android.support.wearable.watchface.WatchFaceStyle;
+import android.view.Display;
+import android.view.LayoutInflater;
 import android.view.SurfaceHolder;
+import android.view.View;
 import android.view.WindowInsets;
+import android.view.WindowManager;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
-
 import java.lang.ref.WeakReference;
+import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.concurrent.TimeUnit;
@@ -45,9 +52,6 @@ import java.util.concurrent.TimeUnit;
  * low-bit ambient mode, the text is drawn without anti-aliasing in ambient mode.
  */
 public class SunshineWatchFace extends CanvasWatchFaceService {
-    private static final Typeface NORMAL_TYPEFACE =
-            Typeface.create(Typeface.SANS_SERIF, Typeface.NORMAL);
-
     /**
      * Update rate in milliseconds for interactive mode. We update once a second since seconds are
      * displayed in interactive mode.
@@ -87,8 +91,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
     private class Engine extends CanvasWatchFaceService.Engine {
         final Handler mUpdateTimeHandler = new EngineHandler(this);
         boolean mRegisteredTimeZoneReceiver = false;
-        Paint mBackgroundPaint;
-        Paint mTextPaint;
         boolean mAmbient;
         Calendar mCalendar;
         final BroadcastReceiver mTimeZoneReceiver = new BroadcastReceiver() {
@@ -98,8 +100,17 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 invalidate();
             }
         };
-        float mXOffset;
-        float mYOffset;
+        float mXOffset = 0;
+        float mYOffset = 0;
+
+        private int specW, specH;
+        private View viewWatchFaceLayout;
+        private ProgressBar progressBarSecond;
+        private TextView textViewDigitalClock, fullDate, highTemperature, lowTemperature;
+        private LinearLayout linearLayoutWeather;
+        private ImageView weatherIcon;
+        private final Point displaySize = new Point();
+
 
         /**
          * Whether the display supports fewer bits for each color in ambient mode. When true, we
@@ -117,15 +128,25 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                     .setShowSystemUiTime(false)
                     .setAcceptsTapEvents(true)
                     .build());
-            Resources resources = SunshineWatchFace.this.getResources();
-            mYOffset = resources.getDimension(R.dimen.digital_y_offset);
 
-            mBackgroundPaint = new Paint();
-            mBackgroundPaint.setColor(resources.getColor(R.color.background));
+            // Inflate the layout that we're using for the watch face
+            LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+            this.viewWatchFaceLayout = inflater.inflate(R.layout.sunshine_watch_face, null);
 
-            mTextPaint = new Paint();
-            mTextPaint = createTextPaint(resources.getColor(R.color.digital_text));
 
+            // Load the display spec - we'll need this later for measuring myLayout
+            Display display = ((WindowManager) getSystemService(Context.WINDOW_SERVICE))
+                    .getDefaultDisplay();
+            display.getSize(displaySize);
+
+            this.progressBarSecond = (ProgressBar) viewWatchFaceLayout.findViewById(R.id.progressBarSecond);
+            this.textViewDigitalClock = (TextView)viewWatchFaceLayout.findViewById(R.id.digital_Clock);
+            this.fullDate = (TextView) viewWatchFaceLayout.findViewById(R.id.full_date);
+            this.highTemperature = (TextView) viewWatchFaceLayout.findViewById(R.id.high_temperature);
+            this.lowTemperature = (TextView) viewWatchFaceLayout.findViewById(R.id.low_temperature);
+            this.linearLayoutWeather = (LinearLayout) viewWatchFaceLayout.findViewById(R.id.linear_layout_weather);
+            this.weatherIcon = (ImageView) viewWatchFaceLayout.findViewById(R.id.weather_icon);
+            setTextAppearance(getBaseContext(),R.style.text_digital_clock, textViewDigitalClock);
             mCalendar = Calendar.getInstance();
         }
 
@@ -133,14 +154,6 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         public void onDestroy() {
             mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
             super.onDestroy();
-        }
-
-        private Paint createTextPaint(int textColor) {
-            Paint paint = new Paint();
-            paint.setColor(textColor);
-            paint.setTypeface(NORMAL_TYPEFACE);
-            paint.setAntiAlias(true);
-            return paint;
         }
 
         @Override
@@ -183,15 +196,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         public void onApplyWindowInsets(WindowInsets insets) {
             super.onApplyWindowInsets(insets);
 
-            // Load resources that have alternate values for round watches.
-            Resources resources = SunshineWatchFace.this.getResources();
-            boolean isRound = insets.isRound();
-            mXOffset = resources.getDimension(isRound
-                    ? R.dimen.digital_x_offset_round : R.dimen.digital_x_offset);
-            float textSize = resources.getDimension(isRound
-                    ? R.dimen.digital_text_size_round : R.dimen.digital_text_size);
-
-            mTextPaint.setTextSize(textSize);
+            // Recompute the MeasureSpec fields - these determine the actual size of the layout
+            specW = View.MeasureSpec.makeMeasureSpec(displaySize.x, View.MeasureSpec.EXACTLY);
+            specH = View.MeasureSpec.makeMeasureSpec(displaySize.y, View.MeasureSpec.EXACTLY);
         }
 
         @Override
@@ -211,9 +218,21 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
             super.onAmbientModeChanged(inAmbientMode);
             if (mAmbient != inAmbientMode) {
                 mAmbient = inAmbientMode;
-                if (mLowBitAmbient) {
-                    mTextPaint.setAntiAlias(!inAmbientMode);
+
+                // Show/hide the seconds fields
+                if (inAmbientMode) {
+                    progressBarSecond.setVisibility(View.INVISIBLE);
+                    setTextAppearance(getBaseContext(),R.style.text_digital_clock_low, textViewDigitalClock);
+                    fullDate.setVisibility(View.INVISIBLE);
+                    linearLayoutWeather.setVisibility(View.INVISIBLE);
+
+                } else {
+                    progressBarSecond.setVisibility(View.VISIBLE);
+                    setTextAppearance(getBaseContext(),R.style.text_digital_clock, textViewDigitalClock);
+                    fullDate.setVisibility(View.VISIBLE);
+                    linearLayoutWeather.setVisibility(View.VISIBLE);
                 }
+
                 invalidate();
             }
 
@@ -247,23 +266,23 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
 
         @Override
         public void onDraw(Canvas canvas, Rect bounds) {
-            // Draw the background.
-            if (isInAmbientMode()) {
-                canvas.drawColor(Color.BLACK);
-            } else {
-                canvas.drawRect(0, 0, bounds.width(), bounds.height(), mBackgroundPaint);
-            }
-
-            // Draw H:MM in ambient mode or H:MM:SS in interactive mode.
             long now = System.currentTimeMillis();
             mCalendar.setTimeInMillis(now);
+            this.textViewDigitalClock.setText(String.format("%02d:%02d", mCalendar.get(Calendar.HOUR),
+                    mCalendar.get(Calendar.MINUTE)));
+            this.progressBarSecond.setProgress(mCalendar.get(Calendar.SECOND));
+            this.fullDate.setText(new SimpleDateFormat("EEE, d MMM yyyy").format(mCalendar.getTime()));
+            this.highTemperature.setText(String.format("%s\u00b0",30));
+            this.lowTemperature.setText(String.format("%s\u00b0", 25));
 
-            String text = mAmbient
-                    ? String.format("%d:%02d", mCalendar.get(Calendar.HOUR),
-                    mCalendar.get(Calendar.MINUTE))
-                    : String.format("%d:%02d:%02d", mCalendar.get(Calendar.HOUR),
-                    mCalendar.get(Calendar.MINUTE), mCalendar.get(Calendar.SECOND));
-            canvas.drawText(text, mXOffset, mYOffset, mTextPaint);
+            // Update the layout
+            viewWatchFaceLayout.measure(specW, specH);
+            viewWatchFaceLayout.layout(0, 0, viewWatchFaceLayout.getMeasuredWidth(), viewWatchFaceLayout.getMeasuredHeight());
+
+            // Draw it to the Canvas
+            canvas.drawColor(Color.BLACK);
+            canvas.translate(mXOffset, mYOffset);
+            viewWatchFaceLayout.draw(canvas);
         }
 
         /**
@@ -295,6 +314,15 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 long delayMs = INTERACTIVE_UPDATE_RATE_MS
                         - (timeMs % INTERACTIVE_UPDATE_RATE_MS);
                 mUpdateTimeHandler.sendEmptyMessageDelayed(MSG_UPDATE_TIME, delayMs);
+            }
+        }
+
+
+        void setTextAppearance(Context context, int style, TextView textView){
+            if (Build.VERSION.SDK_INT < 22) {
+                textView.setTextAppearance(context, style);
+            } else if (Build.VERSION.SDK_INT > 22) {
+                textView.setTextAppearance(style);
             }
         }
     }
