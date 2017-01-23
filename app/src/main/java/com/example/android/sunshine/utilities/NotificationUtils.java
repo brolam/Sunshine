@@ -12,13 +12,23 @@ import android.net.Uri;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
 import android.support.v4.content.ContextCompat;
-
+import android.util.Log;
 import com.example.android.sunshine.DetailActivity;
 import com.example.android.sunshine.R;
 import com.example.android.sunshine.data.SunshinePreferences;
 import com.example.android.sunshine.data.WeatherContract;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.DataMap;
+import com.google.android.gms.wearable.MessageApi;
+import com.google.android.gms.wearable.Node;
+import com.google.android.gms.wearable.NodeApi;
+import com.google.android.gms.wearable.Wearable;
+
+import java.io.ByteArrayOutputStream;
+import java.util.Calendar;
 
 public class NotificationUtils {
+    private static final String LOG_TAG = NotificationUtils.class.getName();
 
     /*
      * The columns of data that we are interested in displaying within our notification to let
@@ -45,6 +55,11 @@ public class NotificationUtils {
      * arbitrary and can be set to whatever you like. 3004 is in no way significant.
      */
     private static final int WEATHER_NOTIFICATION_ID = 3004;
+
+    /*
+    * This android wear path notification
+    */
+    public static final String PATH_TODAY_WEATHER = "/today_Weather";
 
     /**
      * Constructs and displays a notification for the newly updated weather for today.
@@ -139,6 +154,87 @@ public class NotificationUtils {
 
         /* Always close your cursor when you're done with it to avoid wasting resources. */
         todayWeatherCursor.close();
+    }
+
+    /**
+     * Send message with weather information to all Android Wear connected.
+     * @param context
+     * @param googleApiClient
+     */
+    public static void notifyWearOfNewWeather(Context context, final GoogleApiClient googleApiClient) {
+         /* Build the URI for today's weather*/
+        Uri todaysWeatherUri = WeatherContract.WeatherEntry
+                .buildWeatherUriWithDate(SunshineDateUtils.normalizeDate(System.currentTimeMillis()));
+
+        /*
+         * The MAIN_FORECAST_PROJECTION array passed in as the second parameter is defined in our WeatherContract
+         * class and is used to limit the columns returned in our cursor.
+         */
+        Cursor todayWeatherCursor = context.getContentResolver().query(
+                todaysWeatherUri,
+                WEATHER_NOTIFICATION_PROJECTION,
+                null,
+                null,
+                null);
+        try {
+
+        /*
+         * If todayWeatherCursor is empty, moveToFirst will return false. If our cursor is not
+         * empty, we want to show the notification.
+         */
+            if (todayWeatherCursor.moveToFirst()) {
+                int weatherId = todayWeatherCursor.getInt(INDEX_WEATHER_ID);
+                double high = todayWeatherCursor.getDouble(INDEX_MAX_TEMP);
+                double low = todayWeatherCursor.getDouble(INDEX_MIN_TEMP);
+                Resources resources = context.getResources();
+                int smallArtResourceId = SunshineWeatherUtils
+                        .getSmallArtResourceIdForWeatherCondition(weatherId);
+                Bitmap largeIcon = BitmapFactory.decodeResource(
+                        resources,
+                        smallArtResourceId);
+                //This information is valid for the current day.
+                Calendar calendar = Calendar.getInstance();
+                calendar.set(Calendar.HOUR, 23);
+                calendar.set(Calendar.MINUTE, 59);
+                calendar.set(Calendar.SECOND, 59);
+
+                DataMap dataMap = new DataMap();
+                //Send formatted weather information according to the user's preference.
+                dataMap.putString("formatTemperatureHigh", SunshineWeatherUtils.formatTemperature(context, high));
+                dataMap.putString("formatTemperatureLow", SunshineWeatherUtils.formatTemperature(context, low));
+                dataMap.putLong("validUntil", calendar.getTimeInMillis());
+
+                //Compact and converts the icon to an array of bytes
+                ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+                largeIcon.compress(Bitmap.CompressFormat.PNG, 100, outputStream);
+                dataMap.putByteArray("smallIcon", outputStream.toByteArray());
+                final byte[] bytes = dataMap.toByteArray();
+
+                //Send message with weather information to all Android Wear connected.
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (googleApiClient.isConnected()) {
+                            googleApiClient.connect();
+                        }
+                        NodeApi.GetConnectedNodesResult nodes = Wearable.NodeApi.getConnectedNodes(googleApiClient).await();
+                        for (Node node : nodes.getNodes()) {
+                            MessageApi.SendMessageResult result = Wearable.MessageApi.sendMessage(googleApiClient, node.getId(), PATH_TODAY_WEATHER, bytes).await();
+                            if (!result.getStatus().isSuccess()) {
+                                Log.e(LOG_TAG, "Error node:" + node.getDisplayName());
+                            } else {
+                                Log.i(LOG_TAG, "Sent to: " + node.getDisplayName() + ", path: " + PATH_TODAY_WEATHER);
+                            }
+                        }
+                    }
+                }).start();
+
+
+            }
+        } finally {
+            /* Always close your cursor when you're done with it to avoid wasting resources. */
+            todayWeatherCursor.close();
+        }
     }
 
     /**

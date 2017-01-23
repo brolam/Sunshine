@@ -23,7 +23,7 @@ android {
 
 dependencies {
     compile fileTree(include: ['*.jar'], dir: 'libs')
-    wearApp project(':watchface')
+    wearApp project(':wear')
     compile 'com.android.support:appcompat-v7:25.1.0'
 
     compile 'com.android.support:recyclerview-v7:25.0.1'
@@ -39,4 +39,5 @@ dependencies {
     androidTestCompile 'com.android.support:support-annotations:25.1.0'
     androidTestCompile 'com.android.support.test:runner:0.5'
     androidTestCompile 'com.android.support.test:rules:0.5'
+    compile 'com.google.android.gms:play-services-wearable:10.0.1'
 }

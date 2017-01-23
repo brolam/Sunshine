@@ -13,7 +13,10 @@
      WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
      See the License for the specific language governing permissions and
      limitations under the License.
+
+     Layout for square and round clock. For round layout, please see dimens round.
 -->
+
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
@@ -21,7 +24,6 @@
     android:padding="8dp"
     android:background="@color/background"
     >
-
     <ProgressBar
         android:id="@+id/progressBarSecond"
         style="?android:attr/progressBarStyleHorizontal"
@@ -58,17 +60,20 @@
     <LinearLayout
         android:id="@+id/linear_layout_weather"
         android:orientation="horizontal"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:layout_below="@+id/full_date"
         android:layout_centerHorizontal="true"
-        android:gravity="center_vertical">
+        android:gravity="center_vertical|center_horizontal"
+        android:layout_marginTop="@dimen/default_margin">
 
         <ImageView
             android:id="@+id/weather_icon"
-            android:src="@drawable/ic_clear"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            tools:src="@mipmap/ic_launcher"
+            android:layout_width="32dp"
+            android:layout_height="32dp"
+            android:layout_marginRight="@dimen/default_margin"
+
             />
 
         <TextView
@@ -76,7 +81,7 @@
             android:layout_height="wrap_content"
             tools:text="10\u00b0"
             android:id="@+id/high_temperature"
-            android:layout_centerHorizontal="true"
+            android:layout_marginRight="@dimen/default_margin"
             style="@style/text_high_temperature"
             />
 
@@ -85,7 +90,6 @@
             android:layout_height="wrap_content"
             tools:text="10\u00b0"
             android:id="@+id/low_temperature"
-            android:layout_centerHorizontal="true"
             style="@style/text_low_temperature"
             />
 

@@ -28,13 +28,13 @@
 
     <style name="text_digital_clock" parent="text_default">
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">62dp</item>
+        <item name="android:textSize">52dp</item>
     </style>
 
     <style name="text_digital_clock_low" parent="text_default">
         <item name="android:fontFamily">sans-serif-light</item>
         <item name="android:textStyle">normal</item>
-        <item name="android:textSize">62dp</item>
+        <item name="android:textSize">52dp</item>
     </style>
 
 
@@ -44,10 +44,10 @@
 
     <style name="text_high_temperature" parent="text_default">
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">22dp</item>
+        <item name="android:textSize">24dp</item>
     </style>
 
     <style name="text_low_temperature" parent="text_default">
-        <item name="android:textSize">22dp</item>
+        <item name="android:textSize">24dp</item>
     </style>
 </resources>

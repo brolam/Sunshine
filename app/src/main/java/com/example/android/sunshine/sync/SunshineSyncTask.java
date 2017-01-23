@@ -103,6 +103,8 @@ public class SunshineSyncTask {
                 if (notificationsEnabled && oneDayPassedSinceLastNotification) {
                     NotificationUtils.notifyUserOfNewWeather(context);
                 }
+                //Send the weather information updated to Android Wear Device connected
+                SunshineWearService.sendTodayWeather(context);
 
             /* If the code reaches this point, we have successfully performed our sync */
 
