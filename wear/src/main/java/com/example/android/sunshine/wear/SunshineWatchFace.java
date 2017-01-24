@@ -191,7 +191,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         @Override
         public void onDestroy() {
             mUpdateTimeHandler.removeMessages(MSG_UPDATE_TIME);
-            //googleApiClient.disconnect();
+            googleApiClient.disconnect();
             super.onDestroy();
         }
 
@@ -209,6 +209,10 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                 invalidate();
             } else {
                 unregisterReceiver();
+                if ( googleApiClient.isConnected()){
+                    googleApiClient.disconnect();
+                }
+
             }
 
             // Whether the timer should be running depends on whether we're visible (as well as
@@ -398,7 +402,7 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
                             if (!result.getStatus().isSuccess()) {
                                 Log.e(LOG_TAG, "Error node:" + node.getDisplayName());
                             } else {
-                                Log.i(LOG_TAG, "Sent to: " + node.getDisplayName() + ", path: " + PATH_TODAY_WEATHER);
+                                Log.i(LOG_TAG, "Sent to: " + node.getDisplayName() + ", path: " + PATH_TODAY_WEATHER_OUTDATED);
                             }
                         }
                     }
@@ -426,7 +430,9 @@ public class SunshineWatchFace extends CanvasWatchFaceService {
         @Override
         public void onConnected(@Nullable Bundle bundle) {
             Wearable.MessageApi.addListener(googleApiClient, this);
-            notifyTodayWeatherOutdated();
+            if (todayWeatherData.isExpired()) {
+                notifyTodayWeatherOutdated();
+            }
         }
 
         @Override
